@@ -31,14 +31,31 @@ ALLOWED_HOSTS = []
 # Application definition
 
 INSTALLED_APPS = [
+    'daphne',
+    'home',
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
-    'home.apps.HomeConfig'
+    #'home.apps.HomeConfig',
+    'rest_framework',
+    
+    
 ]
+ASGI_APPLICATION = 'pojek.asgi.application'
+
+CHANNEL_LAYERS = {
+    'default': {
+        'BACKEND': 'channels_redis.core.RedisChannelLayer',
+        'CONFIG': {
+            "hosts": [('127.0.0.1',
+                        6380)],
+        },
+    },
+}
+
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
@@ -51,6 +68,7 @@ MIDDLEWARE = [
 ]
 
 ROOT_URLCONF = 'pojek.urls'
+AUTH_USER_MODEL = 'home.User'
 
 TEMPLATES = [
     {
@@ -70,7 +88,9 @@ TEMPLATES = [
     },
 ]
 
-WSGI_APPLICATION = 'pojek.wsgi.application'
+#WSGI_APPLICATION = 'pojek.wsgi.application'
+
+
 
 
 # Database
@@ -121,7 +141,14 @@ USE_TZ = True
 STATIC_URL = "static/"
 STATICFILES_DIRS = [BASE_DIR / "static"]  # new
 
+MEDIA_URL = '/images/'
+MEDIA_ROOT = BASE_DIR / 'static/images'
+
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.1/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+X_FRAME_OPTIONS = "ALLOW-FROM https://open.spotify.com"
+
+

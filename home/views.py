@@ -1,19 +1,22 @@
-from django.shortcuts import render, redirect
+from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib import messages
 from django.http import HttpResponse
+from django.http import JsonResponse
 from django.db.models import Q
-from .models import Hive, Topic, Message
-from .forms import HiveForm
-from django.contrib.auth.models import User
+from .models import Hive, Topic, Message, User
+import json
+# from django.contrib.auth.models import User
 from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.decorators import login_required
-from django.contrib.auth.forms import UserCreationForm
+# from django.contrib.auth.forms import UserCreationForm
+from .forms import UserForm, HiveForm, myUserCreationForm
 import urllib.parse
+from channels.layers import get_channel_layer
+from asgiref.sync import async_to_sync
+from django.views.decorators.csrf import csrf_exempt
 
-'''
-hive = room
-buzz = name
-'''
+
+
 
 # Create your views here.
 def loginView(request):
@@ -36,31 +39,29 @@ def loginView(request):
       messages.error(request, "We could not find your username")
 
   context={'username': username, 'password': password, 'page': login}
-  return render(request, 'home/logreg.html', context)
+  return render(request, 'home/login.html', context)
   
 def logoutView(request):
-  
   logout(request)
   return redirect('homepage')
 
+
 def registerUser(request):
-  form = UserCreationForm()
-  
-  if request.method == 'POST':
-    form = UserCreationForm(request.POST)
-    if form.is_valid():
-      user = form.save(commit=False) #access user first then save
-      user.username = user.username.lower()
-      user.save()
-      login(request, user)
-      
-      return redirect('homepage')
-    else:
-      messages.error(request, "Oops! We encountered an error during registration. Please try again later.")
-  
-  context={'page': 'register', 'form': form}
-  return render(request, 'home/logreg.html', context )
-  
+    form = myUserCreationForm()
+
+    if request.method == 'POST':
+        form = myUserCreationForm(request.POST)
+        if form.is_valid():
+            user = form.save(commit=False)
+            user.username = user.username.lower()
+            user.save()
+            login(request, user)  # Log the user in automatically after registration
+            return redirect('homepage')  # Redirect to the homepage
+        else:
+            messages.error(request, 'An error occurred during registration')
+
+    return render(request, 'home/register.html', {'form': form})
+
 
 def home(request):
   
@@ -84,25 +85,42 @@ def home(request):
   )
 
   hive_count = hives.count()
+  topic_count = topics.count()
   
-  #activities
-
-  
-  context = {'hives': hives, 'topics': topics, 'hive_count': hive_count, "q": q, "chats": chats}
+  context = {'hives': hives, 'topics': topics, 'topic_count': topic_count, 'hive_count': hive_count, "q": q, "chats": chats}
   return render(request, 'home/home.html', context)
 
 # CRUD Operations
-
 def hive(request, pk):
-  hive = Hive.objects.get(id=pk)
+  hive = get_object_or_404(Hive, id=pk)
+
   chats = hive.message_set.all().order_by('-created_at')  # get all messages for that hive
   title = f"{hive.buzz} - Hive"
   members = hive.members.all()
+  
+  
   if request.method == 'POST':  # add a new message, along with user
-    chat = Message.objects.create(  
+    
+    body = request.POST.get('body')
+    file = request.FILES.get('file')
+
+    # Validate file type and size
+    if file:
+        valid_extensions = ['.jpg', '.png', '.pdf', '.docx']
+        if not any(file.name.endswith(ext) for ext in valid_extensions):
+            messages.error(request, 'Invalid file type')
+            return redirect('hive', pk=hive.id)
+
+        if file.size > 5 * 1024 * 1024:  # 5 MB limit
+            messages.error(request, 'File too large (max 5MB)')
+            return redirect('hive', pk=hive.id)
+          
+          
+    Message.objects.create(  
       user = request.user,
       hive = hive,
-      body = request.POST.get('body'),
+      body = body,
+      file=file,
       
     )
     hive.members.add(request.user)
@@ -116,26 +134,68 @@ def hive(request, pk):
   }
   return render(request, 'home/hive.html', context)
 
+
+def send_message(request, hive_id):
+    hive = Hive.objects.get(id=hive_id)
+
+    if request.method == 'POST':
+        message_body = request.POST.get('message')
+
+        # Create a new message in the database
+        message = Message.objects.create(
+            body=message_body,
+            hive=hive,
+            user=request.user
+        )
+        
+        # Automatically add user to hive
+        if request.user not in hive.members.all():
+            hive.members.add(request.user)
+
+
+        # Broadcast the message to the WebSocket group (real-time notification)
+        channel_layer = get_channel_layer()
+        async_to_sync(channel_layer.group_send)(
+            f"hive_{hive_id}",
+            {
+                'type': 'hive_message',
+                'message': f'{request.user.username} sent a message: {message_body}'
+            }
+        )
+
+        return redirect('hive', hive_id=hive_id)
+      
+        
 @login_required(login_url='login')
 def createHive(request):
-  form = HiveForm()
-  if request.method == 'POST':
-    form = HiveForm(request.POST) # send all values to form
-    if form.is_valid(): # check for valid vals
-      
-      hive = form.save(commit=False)
-      hive.creator = request.user 
-      hive.save()
-      return redirect('homepage')
-  
-  context = {"form": form}
-  return render(request, 'home/hiveForm.html', context)
+    topics = Topic.objects.all()
+    form = HiveForm()
+
+    if request.method == 'POST':
+        topic_name = request.POST.get('topic')
+        
+        # Get or create the topic from the input
+        topic, created = Topic.objects.get_or_create(name=topic_name)
+
+        # Create a new Hive object
+        Hive.objects.create(
+            creator=request.user,  # Set the creator to the current logged-in user
+            topic=topic,           # Use the topic object created or fetched above
+            buzz=request.POST.get('buzz'),
+            details=request.POST.get('deets')  # Changed 'deets' to match form field names
+        )
+        
+        return redirect('homepage')
+
+    context = {"form": form, "topics": topics}
+    return render(request, 'home/hiveForm.html', context)
+
 
 @login_required(login_url='login')
 def updateHive(request, pk):
   hive = Hive.objects.get(id=pk)
   form = HiveForm(instance=hive) #pre-fill with values
-  
+  topics = Topic.objects.all()
   if request.user != hive.creator:
     return HttpResponse("Nah fam i can't allow it")
   
@@ -145,7 +205,7 @@ def updateHive(request, pk):
       form.save()
       return redirect('homepage')
     
-  return render(request, 'home/hiveForm.html', {'form': form})
+  return render(request, 'home/hiveForm.html', {'form': form, 'topics': topics,})
 
 @login_required(login_url='login')
 def deleteHive(request, pk):
@@ -201,3 +261,29 @@ def userProfile(request, pk):
     "chats": chats,
   }
   return render(request, 'home/profile.html', context)
+
+
+@login_required(login_url='login')
+def updateUser(request):
+  user = request.user
+  form = UserForm(instance=user)
+  
+  if request.method == 'POST':
+    form = UserForm(request.POST, request.FILES, instance=user)
+    if form.is_valid():
+      form.save()
+      return redirect('user-profile', pk=user.id)
+    
+  context = {"form": form}
+  return render(request, 'home/edit-user.html', context)
+
+@csrf_exempt
+def update_hive_theme(request, hive_id):
+    if request.method == "POST":
+        data = json.loads(request.body)
+        theme = data.get("theme", "light")
+        hive = Hive.objects.get(id=hive_id)
+        hive.theme = theme
+        hive.save()
+        return JsonResponse({"success": True, "theme": theme})
+    return JsonResponse({"success": False}, status=400)
