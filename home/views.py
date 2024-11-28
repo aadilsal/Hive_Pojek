@@ -14,7 +14,13 @@ import urllib.parse
 from channels.layers import get_channel_layer
 from asgiref.sync import async_to_sync
 from django.views.decorators.csrf import csrf_exempt
-
+from django.shortcuts import render
+from agora_token_builder import RtcTokenBuilder
+from django.http import JsonResponse
+import random,time
+import json
+from .models import HiveMember
+from django.views.decorators.csrf import csrf_exempt
 
 
 
@@ -287,3 +293,65 @@ def update_hive_theme(request, hive_id):
         hive.save()
         return JsonResponse({"success": True, "theme": theme})
     return JsonResponse({"success": False}, status=400)
+
+
+
+
+# Create your views here.
+@login_required(login_url='login')
+def lobby(request):
+    return render(request,'home/lobby.html')
+
+@login_required(login_url='login')
+def videohive(request):
+    return render(request,'home/hive_video.html')
+
+def getToken(request):
+    appId='593278c8e8b048f29c13c30c420f101f'
+    appCertificate='82321daa3ad94c3d853dd53acc330d1e'
+    channelName=request.GET.get('channel')
+    uid= random.randint(1,230)
+    expirationTimeInSeconds=3600*24
+    currentTimeStamp=time.time()
+    privilegeExpiredTs=currentTimeStamp + expirationTimeInSeconds
+    role=1
+
+    token = RtcTokenBuilder.buildTokenWithUid(appId, appCertificate, channelName, uid, role, privilegeExpiredTs)
+    return JsonResponse({'token':token,'uid':uid},safe=False)
+
+@csrf_exempt
+def createMember(request):
+    data=json.loads(request.body)
+    member,created= HiveMember.objects.get_or_create(
+        name=data['name'],
+        uid=data['UID'],
+        hive_name=data['hive_name']
+    )
+    return JsonResponse({'name':data['name']},safe=False)
+
+def getMember(request):
+    uid=request.GET.get('UID')
+    hive_name=request.GET.get('hive_name')
+
+    member=HiveMember.objects.get(
+        uid=uid,
+        hive_name=hive_name,
+    )
+    name=member.name
+    return JsonResponse({'name':member.name},safe=False)
+
+
+@csrf_exempt
+def deleteMember(request):
+    data = json.loads(request.body)
+    
+    try:
+        member = HiveMember.objects.get(
+            name=data['name'],
+            uid=data['UID'],
+            hive_name=data['hive_name'],
+        )
+        member.delete()
+        return JsonResponse('Member Deleted!', safe=False)
+    except HiveMember.DoesNotExist:
+        return JsonResponse({'error': 'Member does not exist!'}, status=404, safe=False)

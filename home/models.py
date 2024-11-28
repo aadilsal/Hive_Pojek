@@ -50,6 +50,13 @@ class Message(models.Model):
     
   def __str__(self):
     return self.body[:50]
-  
-  
+
+# Create your models here.
+class HiveMember(models.Model):
+    name=models.CharField(max_length=255)
+    uid=models.CharField(max_length=200)
+    hive_name=models.CharField(max_length=200)
+
+    def __str__(self):
+        return self.name
   
