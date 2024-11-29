@@ -43,6 +43,7 @@ class Message(models.Model):
   file = models.FileField(upload_to='files/', blank=True, null=True)
   updated = models.DateTimeField(auto_now=True) #auto timestamp
   created_at = models.DateTimeField(auto_now_add=True)
+  audio = models.FileField(upload_to="voice_messages/", blank=True, null=True)
   
   class Meta:
     ordering = ['-updated', '-created_at']
@@ -51,7 +52,6 @@ class Message(models.Model):
   def __str__(self):
     return self.body[:50]
 
-# Create your models here.
 class HiveMember(models.Model):
     name=models.CharField(max_length=255)
     uid=models.CharField(max_length=200)

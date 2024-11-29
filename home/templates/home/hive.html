@@ -22,6 +22,7 @@
         </div>
 
         <div class="room__topRight">
+          
           <a href="{% url 'update-hive' hive.id %}">
             <svg
               enable-background="new 0 0 24 24"
@@ -99,6 +100,14 @@
                   <a href="{{ chat.file.url }}" target="_blank">Download File</a>
                 </p>
                 {% endif %}
+                {% if chat.audio %}
+    <!-- Voice message section -->
+    <p>Voice Message:</p>
+    <audio controls>
+      <source src="{{ chat.audio.url }}" type="audio/wav">
+      Your browser does not support the audio element.
+    </audio>
+  {% endif %}
               </div>
             </div>
           </div>
@@ -111,10 +120,13 @@
           {% csrf_token %}
           <input name="body" placeholder="Type a message..."/>
           <input type="file" name="file" />
-          <button type="submit" style="border-radius: 5px; background-color:#696d97; color:#e0dddd; padding: 8px;">Send</button>
+          <button type="submit" style="border-radius: 5px; background-color:#696d97; color:#e0dddd; padding: 5px;">Send</button>
+          <button id="record-btn" style="border-radius: 5px; background-color:#696d97; color:#e0dddd; padding: 5px;">Record</button>
+          <button type="submit" id="send-btn" style="border-radius: 5px; background-color:#696d97; color:#e0dddd; padding: 5px;">Send Voice Message</button>
         </form>
-
+        <audio id="voice-preview" controls style="display: none; margin-top: 10px; width: 100%;"></audio>
       </div>
+      
     </div>
 
     <!-- Members Section -->
@@ -142,6 +154,10 @@
   allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
   loading="lazy"
 ></iframe>
+
+<a class="btn btn--main" href="{% url 'lobby' %}" >
+  Hive Lobby
+ </a>
 
 <div class="theme-toggle">
   <label class="switch">
@@ -304,6 +320,89 @@ document.addEventListener("DOMContentLoaded", function () {
     }
   };
 });
+
+document.addEventListener("DOMContentLoaded", function () {
+    const recordButton = document.getElementById("record-btn");
+    const sendButton = document.getElementById("send-btn");
+    const audioPreview = document.getElementById("voice-preview");
+    const messageForm = document.getElementById("chat-message-form");
+    let mediaRecorder;
+    let audioChunks = [];
+
+    // Handle recording
+    recordButton.addEventListener("click", async () => {
+      if (!mediaRecorder || mediaRecorder.state === "inactive") {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        mediaRecorder = new MediaRecorder(stream);
+
+        mediaRecorder.ondataavailable = (event) => {
+          audioChunks.push(event.data);
+        };
+
+        mediaRecorder.onstop = () => {
+          const audioBlob = new Blob(audioChunks, { type: "audio/wav" });
+          audioChunks = [];
+          const audioURL = URL.createObjectURL(audioBlob);
+          audioPreview.src = audioURL;
+          audioPreview.style.display = "block";
+          sendButton.disabled = false;
+
+          // Attach the Blob to the send button
+          sendButton.audioBlob = audioBlob;
+        };
+
+        mediaRecorder.start();
+        recordButton.textContent = "⏹ Stop Recording";
+      } else {
+        mediaRecorder.stop();
+        recordButton.textContent = "🎤 Record";
+      }
+    });
+
+    // Handle sending the form (voice or text message)
+    messageForm.onsubmit = async function (e) {
+      e.preventDefault();
+
+      const messageInput = messageForm.querySelector("input[name='body']");
+      const fileInput = messageForm.querySelector("input[name='file']").files[0];
+
+      let formData = new FormData();
+      formData.append("csrfmiddlewaretoken", "{{ csrf_token }}");
+
+      // If there is an audio message
+      if (sendButton.audioBlob) {
+        formData.append("audio", sendButton.audioBlob, "voice-message.wav");
+        sendButton.disabled = true; // Disable after sending
+        audioPreview.style.display = "none"; // Hide preview after sending
+        sendButton.audioBlob = null; // Reset audioBlob
+      }
+
+      // If there is a text message
+      if (messageInput.value) {
+        formData.append("body", messageInput.value);
+      }
+
+      // If there is a file attachment
+      if (fileInput) {
+        formData.append("file", fileInput);
+      }
+
+      // Send the form data via POST
+      const response = await fetch("", {
+        method: "POST",
+        body: formData,
+      });
+
+      if (response.ok) {
+        messageInput.value = ""; // Clear the message input field
+        messageForm.querySelector("input[name='file']").value = ""; // Clear the file input
+        alert("Message sent!");
+      } else {
+        alert("Failed to send message.");
+      }
+    };
+  });
+
 </script> {% endcomment %}
 
 <style>

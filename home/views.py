@@ -109,6 +109,7 @@ def hive(request, pk):
     
     body = request.POST.get('body')
     file = request.FILES.get('file')
+    audio = request.FILES.get("audio")  # Voice message
 
     # Validate file type and size
     if file:
@@ -127,6 +128,7 @@ def hive(request, pk):
       hive = hive,
       body = body,
       file=file,
+      audio=audio,
       
     )
     hive.members.add(request.user)
@@ -137,6 +139,7 @@ def hive(request, pk):
     'chats': chats,
     'title': title,
     'members': members,
+    
   }
   return render(request, 'home/hive.html', context)
 
@@ -300,10 +303,14 @@ def update_hive_theme(request, hive_id):
 # Create your views here.
 @login_required(login_url='login')
 def lobby(request):
-    return render(request,'home/lobby.html')
+  # hive = Hive.objects.get(id=pk)
+  # print(hive)
+  # context={"hive":hive}
+  return render(request,'home/lobby.html')
 
 @login_required(login_url='login')
 def videohive(request):
+    
     return render(request,'home/hive_video.html')
 
 def getToken(request):
