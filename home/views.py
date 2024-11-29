@@ -1,5 +1,6 @@
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib import messages
+from django.contrib.auth.hashers import check_password
 from django.http import HttpResponse
 from django.http import JsonResponse
 from django.db.models import Q
@@ -21,7 +22,7 @@ import random,time
 import json
 from .models import HiveMember
 from django.views.decorators.csrf import csrf_exempt
-
+from django.contrib import messages
 
 
 # Create your views here.
@@ -97,51 +98,133 @@ def home(request):
   return render(request, 'home/home.html', context)
 
 # CRUD Operations
+from django.contrib import messages
+from django.shortcuts import render, redirect, get_object_or_404
+from .models import Hive, Message
+
+@login_required(login_url='login')
 def hive(request, pk):
-  hive = get_object_or_404(Hive, id=pk)
+    hive = get_object_or_404(Hive, id=pk)
+    chats = hive.message_set.all().order_by('-created_at')  # Get all messages for that hive
+    title = f"{hive.buzz} - Hive"
+    members = hive.members.all()
 
-  chats = hive.message_set.all().order_by('-created_at')  # get all messages for that hive
-  title = f"{hive.buzz} - Hive"
-  members = hive.members.all()
-  
-  
-  if request.method == 'POST':  # add a new message, along with user
-    
-    body = request.POST.get('body')
-    file = request.FILES.get('file')
-    audio = request.FILES.get("audio")  # Voice message
+    # Check if the hive is private
+    if hive.status == 'private':
+        # If the request method is POST, check the entered password
+        if request.method == "POST":
+            entered_password = request.POST.get('password')
+            print(entered_password)
+            print(hive.password)
+            if check_password(entered_password, hive.password):
+                # If the password is correct, add the user to the hive
+                hive.members.add(request.user)
+                return redirect('hive', pk=hive.id)
+            else:
+                messages.error(request, "Incorrect Password. Try Again!")
+                return render(request, 'home/hive_password.html', {"hive": hive})
+        
+        # If it's a private hive and no password is entered, show the password page
+        return render(request, 'home/hive_password.html', {"hive": hive})
 
-    # Validate file type and size
-    if file:
-        valid_extensions = ['.jpg', '.png', '.pdf', '.docx']
-        if not any(file.name.endswith(ext) for ext in valid_extensions):
-            messages.error(request, 'Invalid file type')
-            return redirect('hive', pk=hive.id)
-
-        if file.size > 5 * 1024 * 1024:  # 5 MB limit
-            messages.error(request, 'File too large (max 5MB)')
-            return redirect('hive', pk=hive.id)
-          
-          
-    Message.objects.create(  
-      user = request.user,
-      hive = hive,
-      body = body,
-      file=file,
-      audio=audio,
-      
-    )
+    # If the hive is public, allow the user to join directly
     hive.members.add(request.user)
-    return redirect('hive', pk = hive.id)
+
+    # Handling new message submission
+    if request.method == 'POST':
+        body = request.POST.get('body')
+        file = request.FILES.get('file')
+        audio = request.FILES.get("audio")  # Voice message
+
+        # Validate file type and size
+        if file:
+            valid_extensions = ['.jpg', '.png', '.pdf', '.docx']
+            if not any(file.name.endswith(ext) for ext in valid_extensions):
+                messages.error(request, 'Invalid file type')
+                return redirect('hive', pk=hive.id)
+
+            if file.size > 5 * 1024 * 1024:  # 5 MB limit
+                messages.error(request, 'File too large (max 5MB)')
+                return redirect('hive', pk=hive.id)
+
+        # Create a new message in the hive
+        Message.objects.create(
+            user=request.user,
+            hive=hive,
+            body=body,
+            file=file,
+            audio=audio,
+        )
+        
+        return redirect('hive', pk=hive.id)
+
+    # Context to render the hive page
+    context = {
+        'hive': hive,
+        'chats': chats,
+        'title': title,
+        'members': members,
+    }
+    return render(request, 'home/hive.html', context)
+
+# @login_required(login_url='login')
+# def hive(request, pk):
+#   hive = get_object_or_404(Hive, id=pk)
+
+#   chats = hive.message_set.all().order_by('-created_at')  # get all messages for that hive
+#   title = f"{hive.buzz} - Hive"
+#   members = hive.members.all()
+  
+ 
+
+
+#   if request.method == 'POST':  # add a new message, along with user
     
-  context = {
-    'hive': hive,
-    'chats': chats,
-    'title': title,
-    'members': members,
+#     body = request.POST.get('body')
+#     file = request.FILES.get('file')
+#     audio = request.FILES.get("audio")  # Voice message
+
+#     # Validate file type and size
+#     if file:
+#         valid_extensions = ['.jpg', '.png', '.pdf', '.docx']
+#         if not any(file.name.endswith(ext) for ext in valid_extensions):
+#             messages.error(request, 'Invalid file type')
+#             return redirect('hive', pk=hive.id)
+
+#         if file.size > 5 * 1024 * 1024:  # 5 MB limit
+#             messages.error(request, 'File too large (max 5MB)')
+#             return redirect('hive', pk=hive.id)
+          
+          
+#     Message.objects.create(  
+#       user = request.user,
+#       hive = hive,
+#       body = body,
+#       file=file,
+#       audio=audio,
+      
+#     )
+#     hive.members.add(request.user)
+#     return redirect('hive', pk = hive.id)
+  
+#   if hive.status == 'private':
+#     if request.method =="POST":
+#       entered_password=request.POST.get('password')
+#       if entered_password == hive.password:
+#           hive.members.add(request.user)
+#           return redirect('hive',pk=hive.id)
+#       else:
+#           messages.error(request,"Incorrect Password. TRY AGAIN!")
+#   return render(request,'home/hive_password.html',{"hive":hive})
     
-  }
-  return render(request, 'home/hive.html', context)
+#   context = {
+#     'hive': hive,
+#     'chats': chats,
+#     'title': title,
+#     'members': members,
+
+#   }
+#   return render(request, 'home/hive.html', context)
 
 
 def send_message(request, hive_id):
@@ -186,12 +269,21 @@ def createHive(request):
         # Get or create the topic from the input
         topic, created = Topic.objects.get_or_create(name=topic_name)
 
+        # Get visibility status (public or private)
+        status = request.POST.get('status')
+        
+        # Get the password only if the hive is private
+        password = request.POST.get('password') if status == 'private' else None
+
+
         # Create a new Hive object
         Hive.objects.create(
             creator=request.user,  # Set the creator to the current logged-in user
             topic=topic,           # Use the topic object created or fetched above
             buzz=request.POST.get('buzz'),
-            details=request.POST.get('deets')  # Changed 'deets' to match form field names
+            details=request.POST.get('deets'), # Changed 'deets' to match form field names
+            status=status,  # Set the hive status to public or private
+            password=password if status == 'private' else None,  # Set password only for private hives
         )
         
         return redirect('homepage')
