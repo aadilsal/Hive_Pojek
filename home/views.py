@@ -153,66 +153,6 @@ def hive(request, pk):
     }
     return render(request, 'home/hive.html', context)
 
-
-# @login_required(login_url='login')
-# def hive(request, pk):
-#   hive = get_object_or_404(Hive, id=pk)
-
-#   chats = hive.message_set.all().order_by('-created_at')  # get all messages for that hive
-#   title = f"{hive.buzz} - Hive"
-#   members = hive.members.all()
-  
- 
-
-
-#   if request.method == 'POST':  # add a new message, along with user
-    
-#     body = request.POST.get('body')
-#     file = request.FILES.get('file')
-#     audio = request.FILES.get("audio")  # Voice message
-
-#     # Validate file type and size
-#     if file:
-#         valid_extensions = ['.jpg', '.png', '.pdf', '.docx']
-#         if not any(file.name.endswith(ext) for ext in valid_extensions):
-#             messages.error(request, 'Invalid file type')
-#             return redirect('hive', pk=hive.id)
-
-#         if file.size > 5 * 1024 * 1024:  # 5 MB limit
-#             messages.error(request, 'File too large (max 5MB)')
-#             return redirect('hive', pk=hive.id)
-          
-          
-#     Message.objects.create(  
-#       user = request.user,
-#       hive = hive,
-#       body = body,
-#       file=file,
-#       audio=audio,
-      
-#     )
-#     hive.members.add(request.user)
-#     return redirect('hive', pk = hive.id)
-  
-#   if hive.status == 'private':
-#     if request.method =="POST":
-#       entered_password=request.POST.get('password')
-#       if entered_password == hive.password:
-#           hive.members.add(request.user)
-#           return redirect('hive',pk=hive.id)
-#       else:
-#           messages.error(request,"Incorrect Password. TRY AGAIN!")
-#   return render(request,'home/hive_password.html',{"hive":hive})
-    
-#   context = {
-#     'hive': hive,
-#     'chats': chats,
-#     'title': title,
-#     'members': members,
-
-#   }
-#   return render(request, 'home/hive.html', context)
-
 def check_hive_password(request,pk):
   hive=get_object_or_404(Hive,id=pk)
   if request.method == "POST":

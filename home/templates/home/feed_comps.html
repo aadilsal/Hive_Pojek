@@ -20,11 +20,11 @@
     </p>
     <span>{{ hive.status|capfirst }}</span> <!-- Display public or private -->
     {% if hive.status == 'private' %}
-        <span>🔒 Private</span>
+        <span>🔒</span>
     {% endif %}
-    <a href="{% url 'hive' pk=hive.id %}">
+    <!-- <a href="{% url 'hive' pk=hive.id %}">
       Enter
-    </a>
+    </a> -->
   </div>
   <div class="roomListRoom__meta">
     <a href="room.html" class="roomListRoom__joined">
