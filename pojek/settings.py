@@ -41,6 +41,7 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     #'home.apps.HomeConfig',
     'rest_framework',
+    'channels',
     
     
 ]
@@ -51,7 +52,7 @@ CHANNEL_LAYERS = {
         'BACKEND': 'channels_redis.core.RedisChannelLayer',
         'CONFIG': {
             "hosts": [('127.0.0.1',
-                        63)],
+                        6379)],
         },
     },
 }

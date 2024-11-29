@@ -9,6 +9,7 @@ urlpatterns = [
   # path("<str:room_name>/", views.room, name="hiveroom"),
   path('', views.home, name="homepage"),
   path('hive/<str:pk>/', views.hive, name="hive"),
+  path('hive/<str:pk>/check_password/',views.check_hive_password,name='check_hive_password'),
   path('create-hive/', views.createHive, name='create-hive'),
   path('update-hive/<str:pk>', views.updateHive, name='update-hive'),
   path('delete-hive/<str:pk>', views.deleteHive, name='delete-hive'),

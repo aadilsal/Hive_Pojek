@@ -102,35 +102,21 @@ from django.contrib import messages
 from django.shortcuts import render, redirect, get_object_or_404
 from .models import Hive, Message
 
+
 @login_required(login_url='login')
 def hive(request, pk):
+    # Fetch the hive
     hive = get_object_or_404(Hive, id=pk)
-    chats = hive.message_set.all().order_by('-created_at')  # Get all messages for that hive
+    chats = hive.message_set.all().order_by('-created_at')
     title = f"{hive.buzz} - Hive"
     members = hive.members.all()
 
-    # Check if the hive is private
-    if hive.status == 'private':
-        # If the request method is POST, check the entered password
-        if request.method == "POST":
-            entered_password = request.POST.get('password')
-            print(entered_password)
-            print(hive.password)
-            if check_password(entered_password, hive.password):
-                # If the password is correct, add the user to the hive
-                hive.members.add(request.user)
-                return redirect('hive', pk=hive.id)
-            else:
-                messages.error(request, "Incorrect Password. Try Again!")
-                return render(request, 'home/hive_password.html', {"hive": hive})
-        
-        # If it's a private hive and no password is entered, show the password page
-        return render(request, 'home/hive_password.html', {"hive": hive})
+    # Check if the hive is private and the user is not a member
+    if hive.status == 'private' and request.user not in hive.members.all():
+        # Redirect to password validation if the hive is private
+        return redirect('check_hive_password', pk=hive.id)
 
-    # If the hive is public, allow the user to join directly
-    hive.members.add(request.user)
-
-    # Handling new message submission
+    # Handle POST request for new messages
     if request.method == 'POST':
         body = request.POST.get('body')
         file = request.FILES.get('file')
@@ -147,7 +133,7 @@ def hive(request, pk):
                 messages.error(request, 'File too large (max 5MB)')
                 return redirect('hive', pk=hive.id)
 
-        # Create a new message in the hive
+        # Create a new message
         Message.objects.create(
             user=request.user,
             hive=hive,
@@ -155,10 +141,10 @@ def hive(request, pk):
             file=file,
             audio=audio,
         )
-        
+
         return redirect('hive', pk=hive.id)
 
-    # Context to render the hive page
+    # If GET request or POST is invalid, render the hive page
     context = {
         'hive': hive,
         'chats': chats,
@@ -166,6 +152,7 @@ def hive(request, pk):
         'members': members,
     }
     return render(request, 'home/hive.html', context)
+
 
 # @login_required(login_url='login')
 # def hive(request, pk):
@@ -225,6 +212,21 @@ def hive(request, pk):
 
 #   }
 #   return render(request, 'home/hive.html', context)
+
+def check_hive_password(request,pk):
+  hive=get_object_or_404(Hive,id=pk)
+  if request.method == "POST":
+     entered_password=request.POST.get('password','').strip()
+
+     if entered_password == hive.password:
+        hive.members.add(request.user)
+        return redirect('hive',pk=hive.id)
+     else:
+        messages.error(request,"Incorrect Password.Enter Again!")
+        return redirect('check_hive_password',pk=hive.id)
+     
+  return render(request,'home/hive_password.html',{"hive":hive})
+
 
 
 def send_message(request, hive_id):
