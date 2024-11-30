@@ -42,7 +42,7 @@ INSTALLED_APPS = [
     #'home.apps.HomeConfig',
     'rest_framework',
     'channels',
-    
+    'utilities',
     
 ]
 ASGI_APPLICATION = 'pojek.asgi.application'

@@ -4,7 +4,7 @@ from django.contrib.auth.hashers import check_password
 from django.http import HttpResponse
 from django.http import JsonResponse
 from django.db.models import Q
-from .models import Hive, Topic, Message, User
+from .models import Hive, Topic, Message, User,UserRole
 import json
 # from django.contrib.auth.models import User
 from django.contrib.auth import authenticate, login, logout
@@ -23,7 +23,12 @@ import json
 from .models import HiveMember
 from django.views.decorators.csrf import csrf_exempt
 from django.contrib import messages
-
+from django.utils import timezone
+from datetime import timedelta
+from django.contrib import messages
+from django.shortcuts import render, redirect, get_object_or_404
+from .models import Hive, Message
+from django.utils.timezone import now
 
 # Create your views here.
 def loginView(request):
@@ -98,22 +103,57 @@ def home(request):
   return render(request, 'home/home.html', context)
 
 # CRUD Operations
-from django.contrib import messages
-from django.shortcuts import render, redirect, get_object_or_404
-from .models import Hive, Message
-
-
 @login_required(login_url='login')
 def hive(request, pk):
     # Fetch the hive
     hive = get_object_or_404(Hive, id=pk)
-    chats = hive.message_set.all().order_by('-created_at')
+    chats = hive.message_set.all().order_by('-created_at')  # Get all messages for the hive
     title = f"{hive.buzz} - Hive"
     members = hive.members.all()
+    current_time = timezone.now()
+
+    user_role_instance= UserRole.objects.filter(user=request.user,hive=hive).first()
+    user_role=user_role_instance.role if user_role_instance else 'bee'
+
+    if request.method == 'POST' and 'assign-role' in request.POST:
+      user_id=request.POST.get('user_id')
+      role=request.POST.get('role')
+      #print(f"Assign Role: user_id = {user_id}, role = {role}")  # Debugging line
+
+      valid_roles=['queen','bee','moderator']
+
+      if role not in valid_roles:
+        messages.error(request,'Invalid Role Selection!')
+        return redirect('hive',pk=hive.id)
+       
+      if user_role == 'queen':
+        user=get_object_or_404(User,id=user_id)
+        if user == hive.creator:
+          messages.error(request,"Cannot change your own role")
+        else:
+          UserRole.objects.update_or_create(user=user,hive=hive,defaults={'role':role})
+          messages.success(request,f"Assigned {role} role to {user.username}")
+      else:
+         messages.error(request,"Queen can assign roles only")
+
+    if request.method == 'POST' and 'kick-member' in request.POST:
+      user_id_to_kick=request.POST.get('user_id_to_kick')
+      if user_role in ['queen','moderator']:
+        user_to_kick=get_object_or_404(User,id=user_id_to_kick)
+
+        if user_to_kick == hive.creator:
+          messages.error(request,'YOU WANNA KICK THE QUEEN! SHE GONNA KICK UR ASS NOW :)')
+        else:
+          hive.members.remove(user_to_kick)
+          messages.success(request,"f{user_to_kick.username} has been kicked from the hive")
+      else:
+        messages.error(request,'ONLY QUEEN/MODERATOR CAN KICK!')
+
+          
+       
 
     # Check if the hive is private and the user is not a member
     if hive.status == 'private' and request.user not in hive.members.all():
-        # Redirect to password validation if the hive is private
         return redirect('check_hive_password', pk=hive.id)
 
     # Handle POST request for new messages
@@ -121,6 +161,11 @@ def hive(request, pk):
         body = request.POST.get('body')
         file = request.FILES.get('file')
         audio = request.FILES.get("audio")  # Voice message
+        vanish_mode = request.POST.get("vanish_mode")  # Check for checkbox value
+
+        # If vanish_mode is checked, it will have a value of 'on'; otherwise, it won't be in the POST data
+        vanish_mode = bool(vanish_mode)  # Convert to boolean
+        
 
         # Validate file type and size
         if file:
@@ -134,24 +179,30 @@ def hive(request, pk):
                 return redirect('hive', pk=hive.id)
 
         # Create a new message
-        Message.objects.create(
-            user=request.user,
-            hive=hive,
-            body=body,
-            file=file,
-            audio=audio,
-        )
+        if body or file or audio:
+            message = Message.objects.create(
+                user=request.user,
+                hive=hive,
+                body=body,
+                file=file,
+                audio=audio,
+                vanish_mode=vanish_mode,
+                vanish_time=timezone.now() + timedelta(seconds=30) if vanish_mode else None
+
+            )
 
         return redirect('hive', pk=hive.id)
 
-    # If GET request or POST is invalid, render the hive page
     context = {
         'hive': hive,
         'chats': chats,
         'title': title,
         'members': members,
+        'current_time': current_time,
+        'user_role':user_role
     }
     return render(request, 'home/hive.html', context)
+
 
 def check_hive_password(request,pk):
   hive=get_object_or_404(Hive,id=pk)
@@ -219,7 +270,7 @@ def createHive(request):
 
 
         # Create a new Hive object
-        Hive.objects.create(
+        hive=Hive.objects.create(
             creator=request.user,  # Set the creator to the current logged-in user
             topic=topic,           # Use the topic object created or fetched above
             buzz=request.POST.get('buzz'),
@@ -227,6 +278,8 @@ def createHive(request):
             status=status,  # Set the hive status to public or private
             password=password if status == 'private' else None,  # Set password only for private hives
         )
+
+        UserRole.objects.create(user=request.user, hive=hive, role='queen')
         
         return redirect('homepage')
 
@@ -275,22 +328,6 @@ def deleteMessage(request, pk):
     return redirect('homepage')
   
   return render(request, 'home/delete.html', {'obj': message})
-
-# def updateMessage(request, pk):
-#     message = Message.objects.get(id=pk)
-#     form = HiveForm(instance=hive) #pre-fill with values
-    
-#     if request.user != message.user:
-#       return HttpResponse("Nah fam i can't allow it")
-    
-#     if request.method == 'POST':  #ensure the current editable hive is updated
-#       form = HiveForm(request.POST, instance=hive)
-#       if form.is_valid():
-#         form.save()
-#         return redirect('homepage')
-      
-#     return render(request, 'home/hiveForm.html', {'form': form})
-
 
 def userProfile(request, pk):
   user = User.objects.get(id=pk)

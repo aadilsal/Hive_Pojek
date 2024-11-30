@@ -22,7 +22,7 @@
         </div>
 
         <div class="room__topRight">
-          
+          {% if user_role == 'queen' or user_role == 'moderator' %}
           <a href="{% url 'update-hive' hive.id %}">
             <svg
               enable-background="new 0 0 24 24"
@@ -57,6 +57,7 @@
               ></path>
             </svg>
           </a>
+        {% endif %}
         </div>
       </div>
 
@@ -82,35 +83,37 @@
         <!-- Chat Conversation -->
         <div id="chat-box" class="threads scroll" style="max-height:50%;">
           {% for chat in chats %}
-          <div class="thread">
-            <div class="thread__top">
-              <div class="thread__author">
-                <a href="{% url 'user-profile' chat.user.id %}" class="thread__authorInfo">
-                  <div class="avatar avatar--small">
+              <div id="message-{{ chat.id }}" 
+     class="thread" 
+     data-vanish-time="{{ chat.vanish_time|date:'U' }}">
+    <div class="thread__top">
+        <div class="thread__author">
+            <a href="{% url 'user-profile' chat.user.id %}" class="thread__authorInfo">
+                <div class="avatar avatar--small">
                     <img src="{{ chat.user.avatar.url }}" />
-                  </div>
-                  <span>{{ chat.user }}</span>
-                </a>
-                <span class="thread__date">{{ chat.created_at | timesince }}</span>
-              </div>
-              <div class="thread__details">
+                </div>
+                <span>{{ chat.user }}</span>
+            </a>
+            <span class="thread__date">{{ chat.created_at|timesince }}</span>
+        </div>
+        <div class="thread__details">
+            {% if chat.vanish_mode and chat.vanish_time and chat.vanish_time < current_time %}
+                <p>This message has vanished</p>
+            {% else %}
                 {{ chat.body }}
                 {% if chat.file %}
-                <p>
-                  <a href="{{ chat.file.url }}" target="_blank">Download File</a>
-                </p>
+                    <p><a href="{{ chat.file.url }}" target="_blank">Download File</a></p>
                 {% endif %}
                 {% if chat.audio %}
-    <!-- Voice message section -->
-    <p>Voice Message:</p>
-    <audio controls>
-      <source src="{{ chat.audio.url }}" type="audio/wav">
-      Your browser does not support the audio element.
-    </audio>
-  {% endif %}
-              </div>
-            </div>
-          </div>
+                    <audio controls>
+                        <source src="{{ chat.audio.url }}" type="audio/wav">
+                        Your browser does not support the audio element.
+                    </audio>
+                {% endif %}
+            {% endif %}
+        </div>
+    </div>
+</div>
           {% endfor %}
         </div>
       </div>
@@ -120,6 +123,10 @@
           {% csrf_token %}
           <input name="body" placeholder="Type a message..."/>
           <input type="file" name="file" />
+          <label for="vanish-mode-toggle">
+            <input type="checkbox" name="vanish_mode" id="vanish-mode-toggle">
+            Enable Vanish Mode
+          </label>
           <button type="submit" style="border-radius: 5px; background-color:#696d97; color:#e0dddd; padding: 5px;">Send</button>
           <button id="record-btn" style="border-radius: 5px; background-color:#696d97; color:#e0dddd; padding: 5px;">Record</button>
           <button type="submit" id="send-btn" style="border-radius: 5px; background-color:#696d97; color:#e0dddd; padding: 5px;">Send Voice Message</button>
@@ -143,6 +150,23 @@
           </p>
         </a>
         {% endfor %}
+        {% if user_role == 'queen' or user_role == 'moderator' %}
+  <!-- Kick Member -->
+  <div class="kick-member">
+    <h4>Kick Member</h4>
+    <form method="POST">
+      {% csrf_token %}
+      <label for="user_id_to_kick">Select Member to Kick:</label>
+      <select name="user_id_to_kick" id="user_id_to_kick">
+        {% for member in members %}
+          <option value="{{ member.id }}">{{ member.username }}</option>
+        {% endfor %}
+      </select>
+      <button type="submit" name="kick-member">Kick Member</button>
+    </form>
+  </div>
+{% endif %}
+
         
 <iframe
   style="border-radius: 12px"
@@ -165,6 +189,30 @@
       <span class="slider round"></span>
   </label>
   <span>Toggle Theme</span>
+</div>
+<div>
+  {% if user_role == 'queen' %}
+<div class="assign-moderator">
+   <h4>Assign Roles</h4>
+   <form method="POST">
+       {% csrf_token %}
+       <label for="user_id">Select User:</label>
+       <select name="user_id" id="user_id">
+           {% for member in members %}
+           <option value="{{ member.id }}">{{ member.username }}</option>
+           {% endfor %}
+       </select>
+       <label for="role">Assign Role:</label>
+       <select name="role" id="role">
+           <option value="queen">Queen</option>
+           <option value="moderator">Moderator</option>
+           <option value="bee">Bee</option>
+       </select>
+       <button type="submit" name="assign-role">Assign Role</button>
+   </form>
+</div>
+{% endif %}
+
 </div>
       </div>
       
@@ -229,6 +277,28 @@
 </script> 
 
 <script>
+  document.addEventListener("DOMContentLoaded", function () {
+    const messages = document.querySelectorAll(".thread");
+
+    messages.forEach((message) => {
+        const vanishTime = message.dataset.vanishTime;
+        if (vanishTime) {
+            const vanishTimestamp = parseInt(vanishTime) * 1000; // Convert to milliseconds
+            const now = Date.now();
+            const delay = vanishTimestamp - now;
+
+            if (delay > 0) {
+                setTimeout(() => {
+                    message.style.display = "none";
+                }, delay);
+            } else {
+                message.style.display = "none"; // Hide immediately if the vanish time has passed
+            }
+        }
+    });
+});
+
+
   document.addEventListener("DOMContentLoaded", function () {
       const toggle = document.getElementById("theme-toggle");
       const body = document.body;
