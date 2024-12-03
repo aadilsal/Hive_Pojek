@@ -611,6 +611,86 @@
         cropper.destroy();
     });
 });
+
+// document.addEventListener("DOMContentLoaded", function () {
+//     const messageForm = document.getElementById("chat-message-form");
+
+//     messageForm.onsubmit = function (e) {
+//         e.preventDefault();
+
+//         const formData = new FormData(messageForm);
+
+//         fetch(messageForm.action, {
+//             method: "POST",
+//             body: formData,
+//             headers: {
+//                 "X-CSRFToken": "{{ csrf_token }}",
+//             },
+//         })
+//         .then((response) => {
+//             if (response.ok) {
+//                 // Reload the page after successful submission
+//                 window.location.reload();
+//             } else {
+//                 alert("Failed to send the message. Please try again.");
+//             }
+//         })
+//         .catch((error) => {
+//             console.error("Error:", error);
+//             alert("An error occurred while sending the message.");
+//         });
+//     };
+// });
+document.addEventListener("DOMContentLoaded", function () {
+    const messageForm = document.getElementById("chat-message-form");
+    const chatBox = document.getElementById("chat-box");
+
+    messageForm.onsubmit = function (e) {
+        e.preventDefault();
+
+        const formData = new FormData(messageForm);
+
+        fetch(messageForm.action, {
+            method: "POST",
+            body: formData,
+            headers: {
+                "X-CSRFToken": "{{ csrf_token }}",
+            },
+        })
+        .then((response) => {
+            if (response.ok) {
+                // Fetch updated chats and refresh chat box
+                fetchChats();
+            } else {
+                alert("Failed to send the message. Please try again.");
+            }
+        })
+        .catch((error) => {
+            console.error("Error:", error);
+            alert("An error occurred while sending the message.");
+        });
+    };
+
+    function fetchChats() {
+        // Make a request to fetch the updated chats
+        fetch(`/hive/{{ hive.id }}/fetch-chats/`, {
+            method: "GET",
+            headers: {
+                "X-CSRFToken": "{{ csrf_token }}",
+            },
+        })
+        .then((response) => response.text())
+        .then((html) => {
+            // Update the chat box with the new messages
+            chatBox.innerHTML = html;
+        })
+        .catch((error) => {
+            console.error("Error fetching chats:", error);
+        });
+    }
+});
+
+
 </script>
 
 <style>

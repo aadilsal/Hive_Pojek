@@ -1,0 +1,31 @@
+{% for chat in chats %}
+    <div id="message-{{ chat.id }}" class="thread" data-vanish-time="{{ chat.vanish_time|date:'U' }}">
+        <div class="thread__top">
+            <div class="thread__author">
+                <a href="{% url 'user-profile' chat.user.id %}" class="thread__authorInfo">
+                    <div class="avatar avatar--small">
+                        <img src="{{ chat.user.avatar.url }}" alt="Avatar" />
+                    </div>
+                    <span>{{ chat.user }}</span>
+                </a>
+                <span class="thread__date">{{ chat.created_at|timesince }}</span>
+            </div>
+            <div class="thread__details">
+                {% if chat.vanish_mode and chat.vanish_time and chat.vanish_time < current_time %}
+                    <p>This message has vanished</p>
+                {% else %}
+                    {{ chat.body }}
+                    {% if chat.file %}
+                        <p><a href="{{ chat.file.url }}" target="_blank">Download File</a></p>
+                    {% endif %}
+                    {% if chat.audio %}
+                        <audio controls>
+                            <source src="{{ chat.audio.url }}" type="audio/wav">
+                            Your browser does not support the audio element.
+                        </audio>
+                    {% endif %}
+                {% endif %}
+            </div>
+        </div>
+    </div>
+{% endfor %}

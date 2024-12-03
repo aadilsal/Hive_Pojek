@@ -688,3 +688,14 @@ def save_edited_photo(request, hive_id):
         return JsonResponse({"success": True, "messageId": message.id})
 
     return JsonResponse({"success": False, "error": "Invalid request method."})
+
+
+from django.template.loader import render_to_string
+from django.http import HttpResponse, JsonResponse
+
+@login_required
+def fetch_chats(request, hive_id):
+    hive = get_object_or_404(Hive, id=hive_id)
+    chats = hive.message_set.all().order_by("-created_at")  # Assuming Message model is linked to Hive
+    html = render_to_string("home/chat_messages.html", {"chats": chats, "current_time": timezone.now()})
+    return HttpResponse(html)
