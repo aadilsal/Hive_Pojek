@@ -1,6 +1,6 @@
 from django.urls import path
 from . import views
-from .views import send_vanishing_message
+from .views import send_vanishing_message, save_edited_photo
 
 urlpatterns = [
   path('login/', views.loginView, name='login'),
@@ -31,6 +31,8 @@ urlpatterns = [
   path('lobby/<int:hive_id>',views.lobby,name='lobby'),
   path('hive_video/<int:hive_id>',views.videohive,name='hive-video'),
   path('get_token/',views.getToken,),
+  path('get-token/', views.get_token, name='get_token'),
+
   path('create_member/',views.createMember),
   path('get_member/',views.getMember),
   path('delete_member/',views.deleteMember),
@@ -45,5 +47,8 @@ urlpatterns = [
   
   #game url
   path('hive/<int:hive_id>/game/', views.game_view, name='game'),
+  
+  path("save-edited-photo/<int:hive_id>/", save_edited_photo, name="save-edited-photo"),
+
 
 ]

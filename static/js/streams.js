@@ -1,17 +1,22 @@
+sessionStorage.setItem('hive', new URLSearchParams(window.location.search).get('hive'));
+sessionStorage.setItem('name', new URLSearchParams(window.location.search).get('username'));
+sessionStorage.setItem('UID', Math.floor(Math.random() * 100000).toString());
+
 const APP_ID = '593278c8e8b048f29c13c30c420f101f';
 const CHANNEL = sessionStorage.getItem('hive');
 const TOKEN = sessionStorage.getItem('token');
 let UID = Number(sessionStorage.getItem('UID'));
 const NAME = sessionStorage.getItem('name');
+const hiveName = new URLSearchParams(window.location.search).get('hive');
+if (!hiveName) {
+    alert('Hive name is missing. Ensure you are joining the correct room.');
+}
+sessionStorage.setItem('hive', hiveName);
 
-
-// Ensure session storage is set before running the script
-sessionStorage.setItem('hive', new URLSearchParams(window.location.search).get('hive'));
-sessionStorage.setItem('name', new URLSearchParams(window.location.search).get('username'));
+let localTracks = [];
+let remoteUsers = {};
 
 const client = AgoraRTC.createClient({ mode: 'rtc', codec: 'vp8' });
-let localTracks = []; // 0 has Audio, 1 has video
-let remoteUsers = {};
 
 let socket = new WebSocket(`ws://127.0.0.1:8000/ws/hive/${CHANNEL}/`);
 
@@ -36,91 +41,83 @@ socket.onmessage = function (event) {
     }
 };
 
-// Handle joining stream and displaying local stream
-let joinAndDisplayLocalStream = async () => {
-    console.log("Attempting to join channel:", { APP_ID, CHANNEL, TOKEN, UID });
-
-    if (!CHANNEL || !TOKEN || !UID) {
-        alert("Channel, Token, or UID is missing.");
-        return;
-    }
-
-    client.on('user-published', handleUserJoined);
-    client.on('user-left', handleUserLeft);
-
+async function fetchToken(channel) {
     try {
-        await client.join(APP_ID, CHANNEL, TOKEN, UID);
-        localTracks = await AgoraRTC.createMicrophoneAndCameraTracks();
+        const uid = Number(sessionStorage.getItem('UID')) || Math.floor(Math.random() * 100000);
+        sessionStorage.setItem('UID', uid); // Store UID
 
-        let player = `
-            <div class="video-container" id="user-container-${UID}">
-                <div class="username-wrapper"><span class="user-name">${NAME}</span></div>
-                <div class="video-player" id="user-${UID}"></div>
-            </div>`;
-        document.getElementById('video-streams').insertAdjacentHTML('beforeend', player);
+        const response = await fetch(`/get-token/?channel=${encodeURIComponent(channel)}&uid=${uid}`);
+        if (!response.ok) {
+            throw new Error(`Failed to fetch token: ${response.statusText}`);
+        }
 
-        localTracks[1].play(`user-${UID}`);
-        await client.publish([localTracks[0], localTracks[1]]);
-
-        console.log("Successfully joined the channel:", CHANNEL);
+        const data = await response.json();
+        if (data.token) {
+            sessionStorage.setItem('token', data.token); // Save token in sessionStorage
+            console.log('Token fetched successfully:', data.token);
+        } else {
+            console.error('Failed to fetch token:', data.error || 'Unknown error');
+            alert('Failed to fetch token. Please try again.');
+        }
     } catch (error) {
-        console.error("Failed to join the stream:", error);
-        alert(`Failed to join the stream: ${error.message}`);
-        window.open('/', '_self');
-    }
-};
-
-
-
-
-async function joinStream() {
-    try {
-        console.log("Joining stream with APP_ID:", APP_ID, "CHANNEL:", CHANNEL, "TOKEN:", TOKEN);
-
-        await client.join(APP_ID, CHANNEL, TOKEN, UID);
-
-        // Create and publish local tracks
-        localTracks = await AgoraRTC.createMicrophoneAndCameraTracks();
-        console.log("Local tracks created:", localTracks);
-
-        const localContainer = document.getElementById("local-player");
-        localTracks[1].play(localContainer);
-        console.log("Local video playing in container:", localContainer);
-
-        await client.publish(localTracks);
-        console.log("Local tracks published");
-
-        // Handle remote users
-        client.on("user-published", async (user, mediaType) => {
-            console.log("User published:", user, "Media type:", mediaType);
-            await client.subscribe(user, mediaType);
-
-            if (mediaType === "video") {
-                const remoteContainer = document.createElement("div");
-                remoteContainer.id = `user-${user.uid}`;
-                document.getElementById("remote-player").append(remoteContainer);
-                user.videoTrack.play(remoteContainer);
-                console.log("Remote video playing in container:", remoteContainer);
-            }
-
-            if (mediaType === "audio") {
-                user.audioTrack.play();
-                console.log("Remote audio playing for user:", user.uid);
-            }
-        });
-
-        client.on("user-left", (user) => {
-            console.log("User left:", user.uid);
-            const remoteContainer = document.getElementById(`user-${user.uid}`);
-            if (remoteContainer) remoteContainer.remove();
-        });
-    } catch (error) {
-        console.error("Failed to join the stream:", error);
+        console.error('Error fetching token:', error);
+        alert('Error fetching token. Please check the console for more details.');
     }
 }
 
+let joinAndDisplayLocalStream = async () => {
+    const token = sessionStorage.getItem('token');
+    const uid = Number(sessionStorage.getItem('UID'));
+    const channel = sessionStorage.getItem('hive');
 
-// Handle when another user joins
+    if (!channel || !token || !uid) {
+        alert("Channel, Token, or UID is missing.");
+        console.error("Missing details:", { channel, token, uid });
+        return;
+    }
+
+    try {
+        await client.join(APP_ID, channel, token, uid);
+        localTracks = await AgoraRTC.createMicrophoneAndCameraTracks();
+
+        const player = `
+            <div class="video-container" id="user-container-${uid}">
+                <div class="username-wrapper"><span class="user-name">${NAME}</span></div>
+                <div class="video-player" id="user-${uid}"></div>
+            </div>`;
+        document.getElementById('video-streams').insertAdjacentHTML('beforeend', player);
+
+        localTracks[1].play(`user-${uid}`);
+        await client.publish(localTracks);
+
+        console.log("Successfully joined the channel:", channel);
+    } catch (error) {
+        console.error("Failed to join the stream:", error);
+        alert(`Failed to join the stream: ${error.message}`);
+    }
+};
+
+document.addEventListener("DOMContentLoaded", async () => {
+    if (!sessionStorage.getItem('hive')) {
+        sessionStorage.setItem('hive', new URLSearchParams(window.location.search).get('hive'));
+    }
+    if (!sessionStorage.getItem('name')) {
+        sessionStorage.setItem('name', new URLSearchParams(window.location.search).get('username'));
+    }
+    if (!sessionStorage.getItem('UID')) {
+        sessionStorage.setItem('UID', Math.floor(Math.random() * 100000).toString());
+    }
+
+    const channel = sessionStorage.getItem('hive');
+    if (!channel) {
+        alert('Channel name is missing.');
+        return;
+    }
+
+    await fetchToken(channel);
+    joinAndDisplayLocalStream();
+});
+
 let handleUserJoined = async (user, mediaType) => {
     try {
         remoteUsers[user.uid] = user;
@@ -128,16 +125,15 @@ let handleUserJoined = async (user, mediaType) => {
 
         if (mediaType === 'video') {
             let player = document.getElementById(`user-container-${user.uid}`);
-            if (player != null) {
+            if (player) {
                 player.remove();
             }
 
-            let member = await getMember(user);
-
-            player = `<div class="video-container" id="user-container-${user.uid}">
-                        <div class="username-wrapper"><span class="user-name">${member.name}</span></div>
-                        <div class="video-player" id="user-${user.uid}"></div>
-                    </div>`;
+            player = `
+                <div class="video-container" id="user-container-${user.uid}">
+                    <div class="username-wrapper"><span class="user-name">User ${user.uid}</span></div>
+                    <div class="video-player" id="user-${user.uid}"></div>
+                </div>`;
             document.getElementById('video-streams').insertAdjacentHTML('beforeend', player);
             user.videoTrack.play(`user-${user.uid}`);
         }
@@ -150,94 +146,44 @@ let handleUserJoined = async (user, mediaType) => {
     }
 };
 
-// Handle when a user leaves the room
 let handleUserLeft = (user) => {
     delete remoteUsers[user.uid];
-    document.getElementById(`user-container-${user.uid}`).remove();
-
-    // Notify other users that this user has left
-    socket.send(JSON.stringify({
-        type: 'user-left',
-        user: { uid: user.uid }
-    }));
+    const player = document.getElementById(`user-container-${user.uid}`);
+    if (player) {
+        player.remove();
+    }
 };
 
 let leaveAndRemoveLocalStream = async () => {
-    for (let i = 0; localTracks.length > i; i++) {
-        localTracks[i].stop();
-        localTracks[i].close();
+    for (let track of localTracks) {
+        track.stop();
+        track.close();
     }
 
     await client.leave();
-    deleteMember();
-
-    // Notify others that this user has left
-    socket.send(JSON.stringify({
-        type: 'user-left',
-        user: { uid: UID }
-    }));
-
     window.open('/', '_self');
 };
 
-let toggleCamera = async(e)=>{
-    if(localTracks[1].muted){
-        await localTracks[1].setMuted(false)
-        e.target.style.backgroundColor='#ffff'
-    } else{
-        await localTracks[1].setMuted(true)
-        e.target.style.backgroundColor='rgb(255,80,80,1)'
+let toggleCamera = async (e) => {
+    if (localTracks[1].muted) {
+        await localTracks[1].setMuted(false);
+        e.target.style.backgroundColor = '#fff';
+    } else {
+        await localTracks[1].setMuted(true);
+        e.target.style.backgroundColor = 'rgb(255,80,80)';
     }
-}
+};
 
-let toggleMic = async(e)=>{
-    if(localTracks[0].muted){
-        await localTracks[0].setMuted(false)
-        e.target.style.backgroundColor='#ffff'
-    } else{
-        await localTracks[0].setMuted(true)
-        e.target.style.backgroundColor='rgb(255,80,80,1)'
+let toggleMic = async (e) => {
+    if (localTracks[0].muted) {
+        await localTracks[0].setMuted(false);
+        e.target.style.backgroundColor = '#fff';
+    } else {
+        await localTracks[0].setMuted(true);
+        e.target.style.backgroundColor = 'rgb(255,80,80)';
     }
-}
-
-
-let createMember = async () => {
-    let response = await fetch('/create_member/', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ 'name': NAME, 'UID': UID, 'hive_name': CHANNEL })
-    });
-
-    let member = await response.json();
-    return member;
 };
-
-let getMember = async (user) => {
-    let response = await fetch(`/get_member/?UID=${user.uid}&hive_name=${CHANNEL}`);
-    let member = await response.json();
-    return member;
-};
-
-let deleteMember = async () => {
-    let response = await fetch('/delete_member/', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ 'name': NAME, 'hive_name': CHANNEL, 'UID': UID })
-    });
-};
-
-document.addEventListener("DOMContentLoaded", () => {
-    joinAndDisplayLocalStream();
-});
-
-//joinStream();
-
 
 document.getElementById('leave-btn').addEventListener('click', leaveAndRemoveLocalStream);
 document.getElementById('camera-btn').addEventListener('click', toggleCamera);
 document.getElementById('mic-btn').addEventListener('click', toggleMic);
-window.addEventListener('beforeunload', deleteMember);

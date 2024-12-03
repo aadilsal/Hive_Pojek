@@ -112,9 +112,8 @@
                 {% else %}
                 {{ chat.body }}
                 {% if chat.file %}
-                <p>
-                  <a href="{{ chat.file.url }}" target="_blank">Download File</a>
-                </p>
+                    <p><a href="{{ chat.file.url }}" target="_blank">Download File</a></p>
+                    <button class="edit-photo-btn" data-photo-url="{{ chat.file.url }}">Edit</button>
                 {% endif %}
                 {% if chat.audio %}
                 <!-- Voice message section -->
@@ -272,6 +271,16 @@
 
     
   </div>
+
+  <div id="photo-editor-modal">
+    <div style="background: #fff; padding: 20px; border-radius: 8px; max-width: 80%; max-height: 80%; overflow: auto;">
+      <canvas id="photo-editor-canvas" style="max-width: 100%;"></canvas>
+      <div style="margin-top: 20px; text-align: center;">
+        <button id="save-edited-photo" style="margin-right: 10px; background-color: #4caf50; color: white; padding: 10px 20px; border: none; border-radius: 4px;">Save</button>
+        <button id="cancel-edit" style="background-color: #f44336; color: white; padding: 10px 20px; border: none; border-radius: 4px;">Cancel</button>
+      </div>
+    </div>
+  </div>
 </main>
 
 <script>
@@ -298,7 +307,7 @@
       if (data.message) {
         
         toastr.success(`${data.username} sent a message!`)
-
+        
         const messageElement = document.createElement("p");
         messageElement.textContent = `${data.username}: ${data.message}`;
         chatBox.appendChild(messageElement);
@@ -525,6 +534,69 @@
     };
   });
 
+  document.addEventListener("DOMContentLoaded", () => {
+    const editButtons = document.querySelectorAll(".edit-photo-btn");
+    const modal = document.getElementById("photo-editor-modal");
+    const canvas = document.getElementById("photo-editor-canvas");
+    const ctx = canvas.getContext("2d");
+    const saveButton = document.getElementById("save-edited-photo");
+    const cancelButton = document.getElementById("cancel-edit");
+    let cropper;
+
+    // Open the editor
+    editButtons.forEach((button) => {
+        button.addEventListener("click", async () => {
+            const imageUrl = button.getAttribute("data-photo-url");
+
+            // Load the image into the canvas
+            const img = new Image();
+            img.crossOrigin = "anonymous";
+            img.src = imageUrl;
+            img.onload = () => {
+                canvas.width = img.width;
+                canvas.height = img.height;
+                ctx.drawImage(img, 0, 0);
+                modal.style.display = "flex"; // Show the modal
+
+                // Initialize Cropper.js
+                cropper = new Cropper(canvas, {
+                    aspectRatio: 16 / 9,
+                    viewMode: 1,
+                });
+            };
+        });
+    });
+
+    // Save the edited photo
+    saveButton.addEventListener("click", async () => {
+        const editedData = cropper.getCroppedCanvas().toDataURL("image/png");
+        modal.style.display = "none";
+
+        // Send the edited photo to the backend
+        const response = await fetch(`/save-edited-photo/{{ hive.id }}/`, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                "X-CSRFToken": "{{ csrf_token }}",
+            },
+            body: JSON.stringify({ editedPhoto: editedData }),
+        });
+
+        const result = await response.json();
+        if (result.success) {
+            alert("Photo edited successfully!");
+            location.reload();
+        } else {
+            alert("Failed to save the edited photo.");
+        }
+    });
+
+    // Cancel editing
+    cancelButton.addEventListener("click", () => {
+        modal.style.display = "none";
+        cropper.destroy();
+    });
+});
 </script>
 
 <style>
@@ -733,6 +805,30 @@ input:checked + .slider:before {
 .voice-message-audio::-webkit-media-controls-panel {
   background-color: #f4f9ff;
   border-radius: 8px;
+}
+
+#photo-editor-modal {
+  display: none;
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.8);
+  z-index: 1000;
+  justify-content: center;
+  align-items: center;
+}
+#photo-editor-modal .editor-container {
+  background: #fff;
+  padding: 20px;
+  border-radius: 8px;
+  max-width: 80%;
+  max-height: 80%;
+  overflow: auto;
+}
+#photo-editor-canvas {
+  max-width: 100%;
 }
 
 

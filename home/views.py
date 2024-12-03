@@ -5,6 +5,8 @@ from django.http import JsonResponse
 from django.db.models import Q
 from .models import Hive, Topic, Message, User, Poll, Option, Vote, UserRole
 import json
+from django.core.files.base import ContentFile
+import base64
 # from django.contrib.auth.models import User
 from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.decorators import login_required
@@ -23,7 +25,7 @@ from django.views.decorators.csrf import csrf_exempt
 from django.contrib.auth.hashers import check_password
 
 from django.utils import timezone
-from datetime import timedelta
+from datetime import datetime, timedelta
 from django.contrib import messages
 from django.shortcuts import render, redirect, get_object_or_404
 from .models import Hive, Message
@@ -132,6 +134,7 @@ def home(request):
   return render(request, 'home/home.html', context)
 
 # CRUD Operations
+@login_required
 def hive(request, pk):
     hive = get_object_or_404(Hive, id=pk)
     #chats = hive.message_set.all().order_by('-created_at')
@@ -489,21 +492,62 @@ def videohive(request, hive_id):
     return render(request, 'home/hive_video.html', {'hive': hive, 'username': username})
     #return render(request,'home/hive_video.html')
 
+# def getToken(request):
+#     appId = '593278c8e8b048f29c13c30c420f101f'
+#     appCertificate = '82321daa3ad94c3d853dd53acc330d1e'
+#     channelName = request.GET.get('channel')
+#     uid = random.randint(1, 230)
+#     expirationTimeInSeconds = 3600 * 24  # 24 hours
+#     currentTimeStamp = int(time.time())
+#     privilegeExpiredTs = currentTimeStamp + expirationTimeInSeconds
+#     role = 1  # Agora's role for publisher
+
+#     if not channelName:
+#         return JsonResponse({'error': 'Channel name is required.'}, status=400)
+
+#     token = RtcTokenBuilder.buildTokenWithUid(appId, appCertificate, channelName, uid, role, privilegeExpiredTs)
+#     return JsonResponse({'token': token, 'uid': uid}, safe=False)
+
 def getToken(request):
-    appId = 'YOUR_APP_ID'
-    appCertificate = 'YOUR_APP_CERTIFICATE'
-    channelName = request.GET.get('channel')
-    uid = random.randint(1, 230)
-    expirationTimeInSeconds = 3600 * 24  # 24 hours
-    currentTimeStamp = int(time.time())
-    privilegeExpiredTs = currentTimeStamp + expirationTimeInSeconds
-    role = 1  # Agora's role for publisher
+    APP_ID = '593278c8e8b048f29c13c30c420f101f'
+    APP_CERTIFICATE = '82321daa3ad94c3d853dd53acc330d1e'
+    channel_name = request.GET.get('channel')
+    uid = request.GET.get('uid')
 
-    if not channelName:
-        return JsonResponse({'error': 'Channel name is required.'}, status=400)
+    if not channel_name or not uid:
+        return JsonResponse({'error': 'Channel or UID missing'}, status=400)
 
-    token = RtcTokenBuilder.buildTokenWithUid(appId, appCertificate, channelName, uid, role, privilegeExpiredTs)
-    return JsonResponse({'token': token, 'uid': uid}, safe=False)
+    # Token expiry time (24 hours)
+    expiration_time_in_seconds = 3600 * 24
+    current_timestamp = int(datetime.utcnow().timestamp())
+    privilege_expired_ts = current_timestamp + expiration_time_in_seconds
+
+    token = RtcTokenBuilder.buildTokenWithUid(
+        APP_ID, APP_CERTIFICATE, channel_name, int(uid), 1, privilege_expired_ts
+    )
+    return JsonResponse({'token': token})
+
+def get_token(request):
+    APP_ID = '593278c8e8b048f29c13c30c420f101f'  # Replace with your Agora App ID
+    APP_CERTIFICATE = '82321daa3ad94c3d853dd53acc330d1e'  # Replace with your Agora App Certificate
+    channel_name = request.GET.get('channel')
+    uid = request.GET.get('uid')
+    role = 1  # Agora Role_Publisher
+    expiration_time_in_seconds = 3600  # 1 hour
+
+    if not channel_name or not uid:
+        return JsonResponse({'error': 'Missing channel or UID'}, status=400)
+
+    current_timestamp = int(time.time())
+    privilege_expired_ts = current_timestamp + expiration_time_in_seconds
+
+    token = RtcTokenBuilder.buildTokenWithUid(
+        APP_ID, APP_CERTIFICATE, channel_name, int(uid), role, privilege_expired_ts
+    )
+
+    return JsonResponse({'token': token})
+
+
 @csrf_exempt
 def createMember(request):
     data=json.loads(request.body)
@@ -625,3 +669,29 @@ def create_poll(request, hive_id):
 def game_view(request, hive_id):
     hive = get_object_or_404(Hive, id=hive_id)
     return render(request, 'home/game.html', {'hive': hive})
+
+
+def save_edited_photo(request, hive_id):
+    if request.method == "POST":
+        data = json.loads(request.body)
+        edited_photo_data = data.get("editedPhoto")
+
+        if not edited_photo_data:
+            return JsonResponse({"success": False, "error": "No photo data provided."})
+
+        # Decode the base64 image data
+        format, imgstr = edited_photo_data.split(";base64,")
+        ext = format.split("/")[-1]
+        img_data = ContentFile(base64.b64decode(imgstr), name=f"edited_photo.{ext}")
+
+        # Save the edited photo as a new message
+        hive = Hive.objects.get(id=hive_id)
+        message = Message.objects.create(
+            user=request.user,
+            hive=hive,
+            file=img_data,
+            body="Edited Photo",
+        )
+        return JsonResponse({"success": True, "messageId": message.id})
+
+    return JsonResponse({"success": False, "error": "Invalid request method."})
