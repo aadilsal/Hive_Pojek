@@ -20,6 +20,7 @@ urlpatterns = [
   path('hive/<int:hive_id>/pin-message/<int:message_id>/', views.pin_message, name='pin-message'),
   path('delete-message/<int:message_id>/', views.delete_message, name='delete-message'),
   path('hive/<int:hive_id>/vanishing-message/', send_vanishing_message, name='send_vanishing_message'),
+  path("hive/<int:hive_id>/fetch-chats/", views.fetch_chats, name="fetch-chats"),
 
   
   #user profile urls

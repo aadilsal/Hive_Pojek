@@ -1,14 +1,15 @@
 {% extends 'main.html' %}
 {% block content %}
 {% load static %}
-    <div style="margin-bottom: 10px;">
-        <a href="{% url 'hive'  hive.id %}" class="btn btn-primary">Return to Chat</a>
-    </div>
+    <div style="display:flex; justify-content:center; align-items:center; flex-direction:column; gap:15px; margin-top:20px;" >
+        
+   
+        <canvas id="canvas" width="276" height="414" ></canvas>
 
+        <a href="{% url 'hive'  hive.id %}" class="btn btn-primary">Return to Chat</a>
   
     <!-- Game canvas where the game will be displayed -->
-    <canvas id="canvas" width="276" height="414"></canvas>
-    
+    </div>
     <!-- Load the game script -->
     <script src="{% static 'js/game.js' %}"></script>
  

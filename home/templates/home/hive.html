@@ -153,10 +153,7 @@
           {% csrf_token %}
           <input name="body" placeholder="Type a message..."/>
           <input type="file" name="file" />
-          <label for="vanish-mode-toggle">
-            <input type="checkbox" name="vanish_mode" id="vanish-mode-toggle">
-            Enable Vanish Mode
-          </label>
+          
           <button type="submit" style="border-radius: 5px; background-color:#696d97; color:#e0dddd; padding: 8px;">Send</button>
           <button id="record-btn" style="border-radius: 5px; background-color:#696d97; color:#e0dddd; padding: 5px;">Record</button>
           <button type="submit" id="send-btn" style="border-radius: 5px; background-color:#696d97; color:#e0dddd; padding: 5px;">Send Voice Message</button>
@@ -205,16 +202,20 @@
           </div>
         {% endif %} {% endcomment %}
         
-<iframe
-  style="border-radius: 12px"
-  src="https://open.spotify.com/embed/playlist/6KZzgENvjZseWpSwneOce4?utm_source=generator"
-  width="100%"
-  height="300"
-  frameborder="0"
-  allowfullscreen=""
-  allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
-  loading="lazy"
-></iframe>
+        {% if hive.playlist_url %}
+        <iframe
+          style="border-radius: 12px"
+          src="{{ hive.playlist_url }}"
+          width="100%"
+          height="300"
+          frameborder="0"
+          allowfullscreen=""
+          allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
+          loading="lazy">
+        </iframe>
+        {% else %}
+        <p>No playlist assigned to this hive.</p>
+        {% endif %}
 
  <div>
   {% if user_role == 'queen' or request.user == hive.creator %}
@@ -611,6 +612,57 @@
         cropper.destroy();
     });
 });
+document.addEventListener("DOMContentLoaded", function () {
+  const messageForm = document.getElementById("chat-message-form");
+  const chatBox = document.getElementById("chat-box");
+
+  messageForm.onsubmit = function (e) {
+      e.preventDefault();
+
+      const formData = new FormData(messageForm);
+
+      fetch(messageForm.action, {
+          method: "POST",
+          body: formData,
+          headers: {
+              "X-CSRFToken": "{{ csrf_token }}",
+          },
+      })
+      .then((response) => {
+          if (response.ok) {
+              // Fetch updated chats and refresh chat box
+              fetchChats();
+          } else {
+              alert("Failed to send the message. Please try again.");
+          }
+      })
+      .catch((error) => {
+          console.error("Error:", error);
+          alert("An error occurred while sending the message.");
+      });
+  };
+
+  function fetchChats() {
+      // Make a request to fetch the updated chats
+      fetch(`/hive/{{ hive.id }}/fetch-chats/`, {
+          method: "GET",
+          headers: {
+              "X-CSRFToken": "{{ csrf_token }}",
+          },
+      })
+      .then((response) => response.text())
+      .then((html) => {
+          // Update the chat box with the new messages
+          chatBox.innerHTML = html;
+      })
+      .catch((error) => {
+          console.error("Error fetching chats:", error);
+      });
+  }
+});
+
+
+
 </script>
 
 <style>

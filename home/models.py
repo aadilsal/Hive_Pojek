@@ -21,7 +21,7 @@ class Topic(models.Model):
     return self.name
 
 class Hive(models.Model):
-  creator = models.ForeignKey(User, on_delete=models.SET_NULL, null=True)
+  creator = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name='hives')
   topic = models.ForeignKey(Topic, on_delete=models.SET_NULL, null=True)
   buzz = models.CharField(max_length=150)
   details = models.TextField(null=True, blank=True)
@@ -29,6 +29,9 @@ class Hive(models.Model):
   updated = models.DateTimeField(auto_now=True) #auto timestamp
   created_at = models.DateTimeField(auto_now_add=True)
   theme = models.CharField(max_length=10, choices=[('light', 'Light'), ('dark', 'Dark')], default='dark')
+  
+  playlist_url = models.URLField(blank=True, null=True)
+
   
   STATUS_CHOICES = (
         ('public', 'Public'),

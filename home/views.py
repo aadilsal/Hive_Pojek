@@ -4,6 +4,9 @@ from django.http import HttpResponse
 from django.http import JsonResponse
 from django.db.models import Q
 from .models import Hive, Topic, Message, User, Poll, Option, Vote, UserRole
+from django.db.models import Count
+from django.template.loader import render_to_string
+from django.http import HttpResponse, JsonResponse
 import json
 from django.core.files.base import ContentFile
 import base64
@@ -127,10 +130,12 @@ def home(request):
     Q(hive__topic__name__icontains = q)
   )
 
+  top_users = User.objects.annotate(hive_count=Count('hives')).order_by('-hive_count')[:5]
+
   hive_count = hives.count()
   topic_count = topics.count()
   
-  context = {'hives': hives, 'topics': topics, 'topic_count': topic_count, 'hive_count': hive_count, "q": q, "chats": chats}
+  context = {'hives': hives, 'topics': topics, 'topic_count': topic_count, 'hive_count': hive_count, "q": q, "chats": chats, "top_users":top_users}
   return render(request, 'home/home.html', context)
 
 # CRUD Operations
@@ -332,6 +337,14 @@ def createHive(request):
     if request.method == 'POST':
         topic_name = request.POST.get('topic')
         
+        # Randomize playlist from the given links
+        playlists = [
+            "https://open.spotify.com/embed/album/4UxlLk460BnmQlRV3WiORh?utm_source=generator&theme=0",
+            "https://open.spotify.com/embed/playlist/6KZzgENvjZseWpSwneOce4?utm_source=generator",
+            "https://open.spotify.com/embed/playlist/4LbIikY0yy3RhjbDippkiV?utm_source=generator",
+            "https://open.spotify.com/embed/playlist/1kC3isNmEMKqhPBEsugTfA?utm_source=generator"
+        ]
+        playlist_url = random.choice(playlists)  # Assign a random playlist
         # Get or create the topic from the input
         topic, created = Topic.objects.get_or_create(name=topic_name)
         
@@ -349,6 +362,7 @@ def createHive(request):
             details=request.POST.get('deets'),  # Changed 'deets' to match form field names
             status=status,  # Set the hive status to public or private
             password=password if status == 'private' else None,
+            playlist_url=playlist_url,
         )
         
         UserRole.objects.create(user=request.user, hive=hive, role='queen')
@@ -435,7 +449,7 @@ def pin_message(request, hive_id, message_id):
 
 def userProfile(request, pk):
   user = User.objects.get(id=pk)
-  hives = user.hive_set.all()
+  hives = user.hives.all()
   topics = Topic.objects.filter(hive__in=hives).distinct()
   chats = user.message_set.all()
   context = {
@@ -688,3 +702,11 @@ def save_edited_photo(request, hive_id):
         return JsonResponse({"success": True, "messageId": message.id})
 
     return JsonResponse({"success": False, "error": "Invalid request method."})
+
+
+@login_required
+def fetch_chats(request, hive_id):
+    hive = get_object_or_404(Hive, id=hive_id)
+    chats = hive.message_set.all().order_by("-created_at")  # Assuming Message model is linked to Hive
+    html = render_to_string("home/chat_messages.html", {"chats": chats, "current_time": timezone.now()})
+    return HttpResponse(html)
