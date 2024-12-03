@@ -1,5 +1,6 @@
 from django.urls import path
 from . import views
+from .views import send_vanishing_message
 
 urlpatterns = [
   path('login/', views.loginView, name='login'),
@@ -18,6 +19,8 @@ urlpatterns = [
   #messaging urls
   path('hive/<int:hive_id>/pin-message/<int:message_id>/', views.pin_message, name='pin-message'),
   path('delete-message/<int:message_id>/', views.delete_message, name='delete-message'),
+  path('hive/<int:hive_id>/vanishing-message/', send_vanishing_message, name='send_vanishing_message'),
+
   
   #user profile urls
   path('user/<str:pk>', views.userProfile, name='user-profile'),  

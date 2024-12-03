@@ -240,6 +240,38 @@ def hive(request, pk):
     }
     return render(request, 'home/hive.html', context)
 
+@login_required
+def send_vanishing_message(request, hive_id):
+    """
+    View for sending a vanishing message to a specific hive.
+    """
+    hive = get_object_or_404(Hive, id=hive_id)
+
+    if request.method == "POST":
+        body = request.POST.get("body", "").strip()
+        vanish_duration = int(request.POST.get("vanish_duration", 1))  # Default to 1 minute
+
+        if not body:
+            messages.error(request, "Message cannot be empty.")
+            return redirect("send_vanishing_message", hive_id=hive.id)
+
+        vanish_time = now() + timedelta(minutes=vanish_duration)
+
+        # Create the message
+        Message.objects.create(
+            user=request.user,
+            hive=hive,
+            body=body,
+            vanish_mode=True,
+            vanish_time=vanish_time,
+        )
+
+        messages.success(request, "Vanishing message sent successfully!")
+        return redirect("hive", pk=hive.id)
+
+    return render(request, "home/send_vanishing_message.html", {"hive": hive})
+
+
 def check_hive_password(request,pk):
   hive=get_object_or_404(Hive,id=pk)
   if request.method == "POST":

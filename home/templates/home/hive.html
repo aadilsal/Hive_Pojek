@@ -94,8 +94,8 @@
         </div>
           {% for chat in chats %}
           <div id="message-{{ chat.id }}" 
-          class="thread" 
-          data-vanish-time="{{ chat.vanish_time|date:'U' }}">
+               class="thread {% if chat.vanish_mode and chat.has_vanished %}vanished{% endif %}" 
+               data-vanish-time="{{ chat.vanish_time|date:'U' }}">
           <div class="thread__top">
               <div class="thread__author">
                   <a href="{% url 'user-profile' chat.user.id %}" class="thread__authorInfo">
@@ -107,9 +107,9 @@
                     <span class="thread__date">{{ chat.created_at|timesince }}</span>
                 </div>
                 <div class="thread__details">
-                    {% if chat.vanish_mode and chat.vanish_time and chat.vanish_time < current_time %}
-                        <p>This message has vanished</p>
-                    {% else %}
+                  {% if chat.vanish_mode and chat.has_vanished %}
+                  <p>This message has vanished.</p>
+                {% else %}
                 {{ chat.body }}
                 {% if chat.file %}
                 <p>
@@ -163,6 +163,7 @@
           <button type="submit" id="send-btn" style="border-radius: 5px; background-color:#696d97; color:#e0dddd; padding: 5px;">Send Voice Message</button>
 
         </form>
+        <a href="{% url 'send_vanishing_message' hive.id %}" class="btn btn--main">Send Vanishing Message</a>
         <audio id="voice-preview" controls style="display: none; margin-top: 10px; width: 100%;"></audio>
 
       </div>
