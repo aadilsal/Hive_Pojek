@@ -123,26 +123,32 @@ let handleUserJoined = async (user, mediaType) => {
         remoteUsers[user.uid] = user;
         await client.subscribe(user, mediaType);
 
-        if (mediaType === 'video') {
+        if (mediaType === "video") {
+            console.log("Rendering remote video for user:", user.uid);
+
             let player = document.getElementById(`user-container-${user.uid}`);
-            if (player) {
+            if (player != null) {
+                console.log("Player already exists, removing it.");
                 player.remove();
             }
 
             player = `
                 <div class="video-container" id="user-container-${user.uid}">
-                    <div class="username-wrapper"><span class="user-name">User ${user.uid}</span></div>
+                    <div class="username-wrapper"><span class="user-name">Remote User</span></div>
                     <div class="video-player" id="user-${user.uid}"></div>
                 </div>`;
             document.getElementById('video-streams').insertAdjacentHTML('beforeend', player);
+
+            // Play the video track
             user.videoTrack.play(`user-${user.uid}`);
         }
 
-        if (mediaType === 'audio') {
+        if (mediaType === "audio") {
+            console.log("Playing remote audio for user:", user.uid);
             user.audioTrack.play();
         }
     } catch (error) {
-        console.error('Error handling user join:', error);
+        console.error("Error handling user join:", error);
     }
 };
 
@@ -187,3 +193,23 @@ let toggleMic = async (e) => {
 document.getElementById('leave-btn').addEventListener('click', leaveAndRemoveLocalStream);
 document.getElementById('camera-btn').addEventListener('click', toggleCamera);
 document.getElementById('mic-btn').addEventListener('click', toggleMic);
+
+
+client.on("user-published", async (user, mediaType) => {
+    console.log("User-published event:", user.uid, "Media type:", mediaType);
+    await handleUserJoined(user, mediaType);
+});
+
+client.on("user-unpublished", (user, mediaType) => {
+    console.log("User-unpublished event:", user.uid, "Media type:", mediaType);
+    handleUserLeft(user);
+});
+
+client.on("user-left", (user) => {
+    console.log("User-left event:", user.uid);
+    handleUserLeft(user);
+});
+
+document.querySelectorAll(".video-player").forEach((player) => {
+    console.log("Video player element found:", player.id);
+});

@@ -313,10 +313,13 @@ def send_message(request, hive_id):
         async_to_sync(channel_layer.group_send)(
             f"hive_{hive_id}",
             {
-                'type': 'hive_message',
-                'message': f'{request.user.username} sent a message: {message_body}'
-            }
-        )
+                "type": "hive_message",
+                "username": request.user.username,
+                "user_avatar": request.user.profile.avatar.url if request.user.profile.avatar else "",  # User avatar URL
+                "message": message_body,
+                "file_url": message.file.url if message.file else None,
+            },
+            )
 
         return redirect('hive', hive_id=hive_id)
       
@@ -492,22 +495,6 @@ def videohive(request, hive_id):
     return render(request, 'home/hive_video.html', {'hive': hive, 'username': username})
     #return render(request,'home/hive_video.html')
 
-# def getToken(request):
-#     appId = '593278c8e8b048f29c13c30c420f101f'
-#     appCertificate = '82321daa3ad94c3d853dd53acc330d1e'
-#     channelName = request.GET.get('channel')
-#     uid = random.randint(1, 230)
-#     expirationTimeInSeconds = 3600 * 24  # 24 hours
-#     currentTimeStamp = int(time.time())
-#     privilegeExpiredTs = currentTimeStamp + expirationTimeInSeconds
-#     role = 1  # Agora's role for publisher
-
-#     if not channelName:
-#         return JsonResponse({'error': 'Channel name is required.'}, status=400)
-
-#     token = RtcTokenBuilder.buildTokenWithUid(appId, appCertificate, channelName, uid, role, privilegeExpiredTs)
-#     return JsonResponse({'token': token, 'uid': uid}, safe=False)
-
 def getToken(request):
     APP_ID = '593278c8e8b048f29c13c30c420f101f'
     APP_CERTIFICATE = '82321daa3ad94c3d853dd53acc330d1e'
@@ -641,10 +628,9 @@ def submit_vote(request):
 
 @login_required
 def create_poll(request, hive_id):
-    
     hive = get_object_or_404(Hive, id=hive_id)
 
-    # Check if the user is the Hive creator or a moderator
+    # Check if the user is authorized
     user_role_instance = UserRole.objects.filter(user=request.user, hive=hive).first()
     user_role = user_role_instance.role if user_role_instance else 'bee'
 
@@ -655,9 +641,16 @@ def create_poll(request, hive_id):
     if request.method == "POST":
         form = PollForm(request.POST)
         if form.is_valid():
-            poll = form.save(commit=False)  # Don't commit yet to associate the hive
-            poll.hive = hive  # Associate the Hive with the poll
+            poll = form.save(commit=False)  # Don't commit yet to associate the Hive
+            poll.hive = hive
             poll.save()  # Save the poll to the database
+
+            # Process and save options
+            options = request.POST.getlist('options')  # Get all "options" inputs
+            for option_text in options:
+                if option_text.strip():  # Skip empty options
+                    Option.objects.create(poll=poll, text=option_text)
+
             messages.success(request, "Poll created successfully!")
             return redirect("hive", pk=hive.id)
     else:

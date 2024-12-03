@@ -22,8 +22,8 @@ class UserForm(ModelForm):
     
 class PollForm(forms.ModelForm):
     options = forms.CharField(
-        widget=forms.Textarea(attrs={"rows": 3, "placeholder": "Enter each option on a new line"}),
-        help_text="Add poll options, one per line.",
+        widget=forms.Textarea(attrs={"rows": 1, "placeholder": "Enter option"}),
+        help_text="Add poll options.",
     )
 
     class Meta:

@@ -24,38 +24,6 @@ class HiveChatConsumer(WebsocketConsumer):
             self.channel_name,
         )
 
-    # def receive(self, text_data):
-    #     data = json.loads(text_data)
-    #     message_content = data.get("message", "")
-    #     file_data = data.get("file", None)
-    #     hive = Hive.objects.get(id=self.hive_id)
-    #     user = self.scope["user"]
-
-    #     file = None
-    #     if file_data:
-    #         # Handle Base64-encoded file
-    #         format, file_str = file_data.split(";base64,")
-    #         ext = format.split("/")[-1]
-    #         file = ContentFile(base64.b64decode(file_str), name=f"{user.username}_upload.{ext}")
-
-    #     # Save the message to the database
-    #     message = Message.objects.create(
-    #         user=user,
-    #         hive=hive,
-    #         body=message_content,
-    #         file=file,
-    #     )
-
-    #     async_to_sync(self.channel_layer.group_send)(
-    #         self.hive_group_name,
-    #         {
-    #             "type": "hive_message",
-    #             "message": message.body,
-    #             "username": user.username,
-    #             "file_url": message.file.url if message.file else None,
-    #         },
-    #     )
-
     def receive(self, text_data):
         data = json.loads(text_data)
         message_content = data.get("message", "").lower()
@@ -138,10 +106,12 @@ class HiveChatConsumer(WebsocketConsumer):
         
         
     def hive_message(self, event):
+        # Send message to WebSocket
         self.send(text_data=json.dumps({
-            "message": event["message"],
             "username": event["username"],
-            "file_url": event["file_url"],
+            "user_avatar": event["user_avatar"],
+            "message": event["message"],
+            "file_url": event.get("file_url", ""),
         }))
 
 # class HiveChatConsumer(WebsocketConsumer):

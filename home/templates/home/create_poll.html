@@ -4,7 +4,24 @@
 <form method="POST">
     {% csrf_token %}
     {{ form.as_p }}
-    <button type="submit" class="btn btn-primary">Create Poll</button>
+    <div id="options-container">
+        <input type="text" name="options" placeholder="Enter an option" required>
+    </div>
+    <button type="button" id="add-option">Add Another Option</button>
+    <button type="submit">Create Poll</button>
 </form>
+
 <a href="{% url 'hive' hive.id %}">Back to Hive</a>
+
+<script>
+    document.getElementById('add-option').addEventListener('click', function() {
+        const container = document.getElementById('options-container');
+        const input = document.createElement('input');
+        input.type = 'text';
+        input.name = 'options';
+        input.placeholder = 'Enter an option';
+        container.appendChild(input);
+    });
+</script>
+
 {% endblock %}
