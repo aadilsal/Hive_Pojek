@@ -612,35 +612,6 @@
     });
 });
 
-// document.addEventListener("DOMContentLoaded", function () {
-//     const messageForm = document.getElementById("chat-message-form");
-
-//     messageForm.onsubmit = function (e) {
-//         e.preventDefault();
-
-//         const formData = new FormData(messageForm);
-
-//         fetch(messageForm.action, {
-//             method: "POST",
-//             body: formData,
-//             headers: {
-//                 "X-CSRFToken": "{{ csrf_token }}",
-//             },
-//         })
-//         .then((response) => {
-//             if (response.ok) {
-//                 // Reload the page after successful submission
-//                 window.location.reload();
-//             } else {
-//                 alert("Failed to send the message. Please try again.");
-//             }
-//         })
-//         .catch((error) => {
-//             console.error("Error:", error);
-//             alert("An error occurred while sending the message.");
-//         });
-//     };
-// });
 document.addEventListener("DOMContentLoaded", function () {
     const messageForm = document.getElementById("chat-message-form");
     const chatBox = document.getElementById("chat-box");
